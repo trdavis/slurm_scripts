@@ -53,6 +53,9 @@ flags.DEFINE_multi_string(
     "param_logspace", [], "Sweeps geometrically spaced values for a parameter."
     ' Given "NAME,START,STOP,NUM" uses --NAME=x for NUM different x between '
     "START and STOP inclusive")
+flags.DEFINE_multi_string(
+    "param_list", [], "Explicit list of values for a parameter. Given in the"
+    ' form "NAME,VAL1,VAL2[,VAL3,...]".')
 flags.DEFINE_integer("runs_per_job", 1,
                      "Number of parameter to sequentially run in each job")
 
@@ -110,8 +113,47 @@ def validate_all_multiparam(param_list: List[str]) -> bool:
   return True
 
 
+def validate_param_list_str(param_str: str):
+  """Validates parameter settings for explicit parameter lists.
+
+  Checks that the value is of the form "NAME,VAL1,VAL2[,VAL3,...]".
+
+  Args:
+      param_str: The `str` value of the parameter to test.
+  Returns:
+      True if the parameter setting is valid.
+  Raises:
+      flags.ValidationError: The parameter setting is invalid.
+  """
+  vals = param_str.split(",")
+  if len(vals) < 3:
+    raise flags.ValidationError(
+        'param_list value must be "NAME,VAL1,VAL2[,VAL3,...]"')
+  return True
+
+
+def validate_all_param_list(param_list: List[str]) -> bool:
+  """Validates a list of explicitly listed parameters.
+
+  See validate_param_list_str()
+
+  Args:
+      param_list: A list of str parameter values.
+  Returns:
+      True if the each parameter value is valid.
+  Raises:
+      flags.ValidationError: One or more parameter value is invalid.
+  """
+  for param_str in param_list:
+    valid = validate_param_list_str(param_str)
+    if not valid:
+      return valid
+  return True
+
+
 flags.register_validator("param_linspace", validate_all_multiparam)
 flags.register_validator("param_logspace", validate_all_multiparam)
+flags.register_validator("param_list", validate_all_param_list)
 
 
 class ParamArray(typing.NamedTuple):
@@ -166,6 +208,35 @@ def parse_all_param_arrays(param_list: List[str],
       A list of `ParamArray` containing all parameter values.
   """
   return [parse_param_array(s, linspace) for s in param_list]
+
+
+def parse_explicit_param_list(param_str: str) -> ParamArray:
+  """Parses parameter values explicitly listed in str form.
+
+  The str should be in form "NAME,VAL1,VAL2[,VAL3,...]".
+
+  Args:
+      param_str: The str value of the parameter, in form
+          "NAME,VAL1,VAL2[,VAL3,...]"
+  Returns:
+      A `ParamArray` containing the parameter values.
+  """
+  tokens = param_str.split(",")
+  assert len(tokens) > 2
+  return ParamArray(tokens[0], tokens[1:])
+
+
+def parse_all_param_lists(param_lists: List[str]) -> List[ParamArray]:
+  """Parses a list of param_list values into arrays.
+
+  See parse_explicit_param_list()
+
+  Args:
+      param_lists: A list of param_list strs for different parameters.
+  Returns:
+      A list of `ParamArray` containing all parameter values.
+  """
+  return [parse_explicit_param_list(s) for s in param_lists]
 
 
 def script_header(num_jobs: int) -> List[str]:
@@ -297,7 +368,8 @@ def script_loop(command: str, param_arrays: List[ParamArray], runs_per_job: int,
 
 def main(argv):
   param_arrays = (parse_all_param_arrays(FLAGS.param_linspace, linspace=True) +
-                  parse_all_param_arrays(FLAGS.param_logspace, linspace=False))
+                  parse_all_param_arrays(FLAGS.param_logspace, linspace=False) +
+                  parse_all_param_lists(FLAGS.param_list))
   total_runs = math.prod(len(pa.values) for pa in param_arrays)
   runs_per_job = FLAGS.runs_per_job
   num_jobs = (total_runs + (runs_per_job - 1)) // runs_per_job  # ceiling div
