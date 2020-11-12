@@ -56,6 +56,8 @@ flags.DEFINE_multi_string(
 flags.DEFINE_multi_string(
     "param_list", [], "Explicit list of values for a parameter. Given in the"
     ' form "NAME,VAL1,VAL2[,VAL3,...]".')
+flags.DEFINE_integer("repeat", 1,
+                     "Number of times to repeat each parameter setting.")
 flags.DEFINE_integer("runs_per_job", 1,
                      "Number of parameter to sequentially run in each job")
 
@@ -273,17 +275,19 @@ def script_param_arrays(param_arrays: Iterable[ParamArray]) -> List[str]:
   return result
 
 
-def script_param_indexing(array_lengths: Iterable[int]) -> List[str]:
+def script_param_indexing(array_lengths: Iterable[int],
+                          repeat: int) -> List[str]:
   """Creates the script lines that set parameter indices for a run.
 
   Args:
       array_lengths: The number of parameter settings used for each parameter,
           in order.
+      repeat: The number of times to repeat each parameter setting
   Returns:
       A list of script lines that set the parameter indices.
   """
   indexing = []
-  indexing.append("idx=${run_index}")
+  indexing.append(f"idx=$((run_index / {repeat}))")
   for i, l in reversed(list(enumerate(array_lengths))):
     indexing.append(f"param_index[{i}]=$((idx % {l}))")
     indexing.append(f"((idx /= {l}))")
@@ -327,7 +331,7 @@ def script_run(command: str, param_names: Iterable[str],
 
 
 def script_loop(command: str, param_arrays: List[ParamArray], runs_per_job: int,
-                total_runs: int) -> List[str]:
+                total_runs: int, repeat: int) -> List[str]:
   """Constructs the script loop that executes all runs for a job.
 
   Args:
@@ -338,6 +342,7 @@ def script_loop(command: str, param_arrays: List[ParamArray], runs_per_job: int,
           for all jobs, not just the current one.
       runs_per_job: The number of runs executed in each individual job.
       total_runs: The number of runs executed across all jobs.
+      repeat: Number of times to repeat each parameter setting
   Returns:
       A list of script lines for executing all job runs.
   """
@@ -357,7 +362,8 @@ def script_loop(command: str, param_arrays: List[ParamArray], runs_per_job: int,
   inner.append(f'if [[ "${{run_index}}" -ge {total_runs} ]]; then')
   inner.append("  break")
   inner.append("fi")
-  inner += script_param_indexing(len(pa.values) for pa in param_arrays)
+  inner += script_param_indexing((len(pa.values) for pa in param_arrays),
+                                 repeat)
   inner.append("")
   inner += script_run(command, (pa.param for pa in param_arrays),
                       (runs_per_job < total_runs))
@@ -370,7 +376,12 @@ def main(argv):
   param_arrays = (parse_all_param_arrays(FLAGS.param_linspace, linspace=True) +
                   parse_all_param_arrays(FLAGS.param_logspace, linspace=False) +
                   parse_all_param_lists(FLAGS.param_list))
+  repeat = FLAGS.repeat;
+  if repeat < 1:
+      print(f"Invalid repeat count {repeat}. Set to 1 for no repeat.")
+      return -1
   total_runs = math.prod(len(pa.values) for pa in param_arrays)
+  total_runs *= repeat
   runs_per_job = FLAGS.runs_per_job
   num_jobs = (total_runs + (runs_per_job - 1)) // runs_per_job  # ceiling div
   if FLAGS.outdir:
@@ -394,7 +405,7 @@ def main(argv):
   script += script_param_arrays(param_arrays)
   script.append("")
   script += script_loop(" ".join(shlex.quote(s) for s in argv[1:]),
-                        param_arrays, runs_per_job, total_runs)
+                        param_arrays, runs_per_job, total_runs, repeat)
   scriptdir = pathlib.Path(FLAGS.dir)
   if not scriptdir.is_dir():
     print("Invalid script directory", scriptdir)
