@@ -73,7 +73,7 @@ def print_usage(name):
 float_regex = re.compile(
     r"[-+]? (?:(?: \d* \. \d+ ) | (?: \d+ \.? ))"
     r"(?: [Ee] [+-]? \d+ )?", re.VERBOSE)
-param_regex = re.compile(r"\# \s* -- (\w+) = (\S+)", re.VERBOSE)
+param_regex = re.compile(r"--(\w[^\s=]*)=(\S+)")
 
 
 def output_files(output_dir: pathlib.Path,
@@ -102,10 +102,10 @@ def output_files(output_dir: pathlib.Path,
 def file_data(file_path: pathlib.Path) -> Optional[OutputFileRawData]:
   """Reads data from a file representing a single run.
 
+  The first line should start with # and give the base command.
   Parameter settings are read from header lines (ignoring the initial line) of
   the form
-
-      # --param=value
+      # --param1=value --param2=value
 
   Args:
       file_path: A pathlib.Path pointing to the file to process
@@ -127,23 +127,23 @@ def file_data(file_path: pathlib.Path) -> Optional[OutputFileRawData]:
     if not command:
       command = line[1:].strip()
     else:
-      match = param_regex.search(line)
-      if not match:
+      matches = param_regex.findall(line)
+      if not matches:
         continue
-      param, setting = match.groups()
-      if not param or not setting:
-        print("Failed to parse parameter name and value from line '{}'".format(
-            line))
-        return None
-      # Try to convert param setting to int/float. This allows proper sorting
-      try:
-        setting = int(setting)
-      except ValueError:
+      for param, setting in matches:
+        if not param or not setting:
+          print("Failed to parse parameter name and value from line '{}'".format(
+              line))
+          return None
+        # Try to convert param setting to int/float. This allows proper sorting
         try:
-          setting = float(setting)
+          setting = int(setting)
         except ValueError:
-          pass
-      params[param] = setting
+          try:
+            setting = float(setting)
+          except ValueError:
+            pass
+        params[param] = setting
 
   return OutputFileRawData(command, params,
                            [line for line in lines if line[0] != "#"])
