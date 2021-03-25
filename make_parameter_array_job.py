@@ -50,9 +50,17 @@ flags.DEFINE_multi_string(
     ' Given "NAME,START,STOP,NUM" uses --NAME=x for NUM different x between '
     "START and STOP inclusive")
 flags.DEFINE_multi_string(
+    "param_intlinspace", [], "Sweeps linearly spaced integer values for a "
+    'parameter Given "NAME,START,STOP,NUM" uses --NAME=x for NUM different x'
+    " between START and STOP inclusive")
+flags.DEFINE_multi_string(
     "param_logspace", [], "Sweeps geometrically spaced values for a parameter."
     ' Given "NAME,START,STOP,NUM" uses --NAME=x for NUM different x between '
     "START and STOP inclusive")
+flags.DEFINE_multi_string(
+    "param_intlogspace", [], "Sweeps geometrically spaced values for a "
+    'parameter. Given "NAME,START,STOP,NUM" uses --NAME=x for NUM different x '
+    "between START and STOP inclusive")
 flags.DEFINE_multi_string(
     "param_list", [], "Explicit list of values for a parameter. Given in the"
     ' form "NAME,VAL1,VAL2[,VAL3,...]".')
@@ -154,7 +162,9 @@ def validate_all_param_list(param_list: List[str]) -> bool:
 
 
 flags.register_validator("param_linspace", validate_all_multiparam)
+flags.register_validator("param_intlinspace", validate_all_multiparam)
 flags.register_validator("param_logspace", validate_all_multiparam)
+flags.register_validator("param_intlogspace", validate_all_multiparam)
 flags.register_validator("param_list", validate_all_param_list)
 
 
@@ -169,7 +179,8 @@ class ParamArray(typing.NamedTuple):
   values: List[str]
 
 
-def parse_param_array(param_str: str, linspace: bool = True) -> ParamArray:
+def parse_param_array(param_str: str, linspace: bool = True,
+                      integer: bool = False) -> ParamArray:
   """Converts a linspace/logspace parameter string into an array of values.
 
   The str should be in format "NAME,START,STOP,NUM".
@@ -179,6 +190,8 @@ def parse_param_array(param_str: str, linspace: bool = True) -> ParamArray:
       param_str: The str value of the parameter.
       linspace: If true, specifies a linearly spaced array. If false, specifies
           a geometrically spaced array.
+      integer: Rounds to integer values for the parameter. Duplicate values will
+          be skipped.
   Returns:
       A `ParamArray` containing the list of parameter values.
   """
@@ -193,11 +206,14 @@ def parse_param_array(param_str: str, linspace: bool = True) -> ParamArray:
   else:
     param_vals = np.logspace(math.log10(start), math.log10(stop), num)
 
+  if integer:
+    param_vals = np.unique(np.rint(param_vals).astype(np.int))
+
   return ParamArray(flag_vals[0], [str(x) for x in param_vals])
 
 
-def parse_all_param_arrays(param_list: List[str],
-                           linspace: bool = True) -> List[ParamArray]:
+def parse_all_param_arrays(param_list: List[str], linspace: bool = True,
+                           integer: bool = False) -> List[ParamArray]:
   """Parses a list of parameter str values into arrays.
 
   See parse_parameter_array()
@@ -209,7 +225,8 @@ def parse_all_param_arrays(param_list: List[str],
   Returns:
       A list of `ParamArray` containing all parameter values.
   """
-  return [parse_param_array(s, linspace) for s in param_list]
+  return [parse_param_array(s, linspace=linspace, integer=integer)
+          for s in param_list]
 
 
 def parse_explicit_param_list(param_str: str) -> ParamArray:
@@ -373,9 +390,14 @@ def script_loop(command: str, param_arrays: List[ParamArray], runs_per_job: int,
 
 
 def main(argv):
-  param_arrays = (parse_all_param_arrays(FLAGS.param_linspace, linspace=True) +
-                  parse_all_param_arrays(FLAGS.param_logspace, linspace=False) +
-                  parse_all_param_lists(FLAGS.param_list))
+  param_arrays = (
+      parse_all_param_arrays(FLAGS.param_linspace, linspace=True) +
+      parse_all_param_arrays(FLAGS.param_intlinspace,
+                             linspace=True, integer=True) +
+      parse_all_param_arrays(FLAGS.param_logspace, linspace=False) +
+      parse_all_param_arrays(FLAGS.param_intlogspace,
+                             linspace=False, integer=True) +
+      parse_all_param_lists(FLAGS.param_list))
   repeat = FLAGS.repeat;
   if repeat < 1:
       print(f"Invalid repeat count {repeat}. Set to 1 for no repeat.")

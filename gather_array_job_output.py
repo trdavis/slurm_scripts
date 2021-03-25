@@ -255,6 +255,7 @@ def last_value(
       dict mapping the value name to the last valid float that appears in the
       output, i.e. the last value in the last line
   """
+  value = None
   for line in reversed(data_lines):
     line = line.strip()
     if not line or line[0] == "#":
