@@ -12,5 +12,5 @@ For details, see the documentation in each script.
 ```bash
 python make_parameter_array_job.py --out=script_name.sh --param_linspace="foo,0,5,6" \
     --param_logspace="bar,0.01,10,4" -- parametric_executable --flag=value positional_argument
-python process_array_job.py --jobscript=$HOME/scratch/jobscripts/script_name.sh --process=process_array_job.py
+python process_array_job.py --jobscript=$HOME/jobscripts/script_name.sh --process=process_array_job.py
 ```

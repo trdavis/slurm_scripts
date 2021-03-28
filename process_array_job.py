@@ -29,7 +29,7 @@ flags.mark_flag_as_required("jobscript")
 flags.DEFINE_string("process", None, "Executable used to process job results")
 flags.mark_flag_as_required("process")
 flags.DEFINE_string("outdir",
-                    str(pathlib.Path.home()) + "/scratch/output/",
+                    str(pathlib.Path.home()) + "/output/",
                     "Directory where array job output is sent")
 flags.DEFINE_string("datadir",
                     str(pathlib.Path.home()) + "/data/",

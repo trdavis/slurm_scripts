@@ -15,7 +15,7 @@ virtual environment.
 
     Example usage:
 
-    gather_all_array_job_output.py 1234567 ~/scratch/output/ ~/data/
+    gather_all_array_job_output.py 1234567 ~/output/ ~/data/
 """
 import pathlib
 import operator

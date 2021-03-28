@@ -35,10 +35,10 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string("out", None, "Name for created job script file")
 flags.mark_flag_as_required("out")
 flags.DEFINE_string("dir",
-                    str(pathlib.Path.home()) + "/scratch/jobscripts/",
+                    str(pathlib.Path.home()) + "/jobscripts/",
                     "Base directory for job scripts")
 flags.DEFINE_string("outdir",
-                    str(pathlib.Path.home()) + "/scratch/output/",
+                    str(pathlib.Path.home()) + "/output/",
                     "Base directory for job output")
 
 HEADER_FLAGS = ["job-name", "output", "error", "time", "mem", "cpus-per-task"]
