@@ -91,6 +91,13 @@ def all_values(data_lines : List[str]) -> List[Dict[str, gather.DataValue]]:
       data.append(record)
   return data
 
+def print_usage(name):
+  """Prints script usage message to stderr.
+
+  Args:
+      name: invoking name for script
+  """
+  print("Usage:", name, "ARRAY_JOB_ID OUTDIR DATADIR", file=sys.stderr)
 
 def main(argv):
   if len(argv) != 4:
